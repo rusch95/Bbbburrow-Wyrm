@@ -91,6 +91,29 @@ class Card():
             self.adv = [base]
         else:
             self.adv = []
+        self.perm_pos = perm_pos
+
+        self.computed = False
+        self.recompute()
+        self.compute()
+
+    def compute(self):
+        # TODO Handle ongoing and such
+        if not self.computed:
+            for adv in self:
+                self.helmets += adv.helmets
+                self.mana += adv.mana
+                self.ppt += adv.ppt
+                self.g_spr += adv.g_spr
+                self.y_spr += adv.y_spr
+                self.b_spr += adv.b_spr
+                self.w_spr += adv.w_spr
+                self.red += adv.red
+                self.green += adv.green
+
+            self.computed = True
+
+    def recompute(self):
         self.helmets = 0
         self.mana = 0
         self.ppt = 0
@@ -100,19 +123,45 @@ class Card():
         self.w_spr = 0
         self.red = 0
         self.green = 0
-        self.perm_pos = perm_pos
+
+        self.computed = False
 
     def get_red(self):
         # TODO Handle ongoing effects
+        self.compute()
         return self.red
 
     def get_eff_red(self):
-        # TODO Handle ongoing effects
+        self.compute()
         return self.red
 
     def get_green(self):
-        # TODO Handle ongoing effects
+        self.compute()
         return self.green
+
+    def get_mana(self):
+        self.compute()
+        return self.mana
+
+    def get_g_spr(self):
+        self.compute()
+        return self.g_spr
+
+    def get_y_spr(self):
+        self.compute()
+        return self.y_spr
+
+    def get_b_spr(self):
+        self.compute()
+        return self.b_spr
+
+    def get_w_spr(self):
+        self.compute()
+        return self.w_spr
+
+    def get_ppt(self):
+        self.compute()
+        return self.ppt
 
     def __iter__(self):
         return iter(self.adv)
@@ -153,10 +202,10 @@ class Player():
         # on the totals
         self.num = i
 
-        cursed_lands = [ Card(base=Advancement("Cursed Land", pos, 0, 1, red = 1),
+        cursed_lands = [ Card(base=Advancement("Cursed Land", pos, 0, 0, mana=1, red=1),
                               perm_pos=pos)
                          for pos in NORM_POS ] * 3
-        fertile_soils = [ Card(base=Advancement("Fertile Soil", pos, 0, 1),
+        fertile_soils = [ Card(base=Advancement("Fertile Soil", pos, 0, 0, mana=1),
                                perm_pos=pos)
                           for pos in NORM_POS ]
         blank_cards = [ Card() for _ in range(NUM_BLANKS) ]
@@ -212,29 +261,37 @@ class Player():
     def setup(self):
         # Pre-Turn Stuff
         self.zero_acc()
+        assert(len(self.field) == 0)
+
+        # Get redness of previous card
+        if self.on_deck:
+            self.red += self.on_deck.get_red()
+            self.green += self.on_deck.get_green()
 
         # Draw cards
-        while self.eff_red() <= MAX_EFF_REDS and len(self.deck) > 0:
+        while self.eff_red() < MAX_EFF_REDS and (len(self.deck) + len(self.discards)) > 0:
             self.draw()
+            print("Field {}, On Deck {}, Eff Red {}".format(self.field,
+                  self.on_deck, self.eff_red()))
 
         if MAX_EFF_REDS < self.eff_red():
             self.spoiled = True
             return
 
     def draw(self, can_spoil=True):
-        assert(len(self.deck) > 0)
+        assert(len(self.deck) > 0 or len(self.discards))
         if self.on_deck is None:
             self.deck += self.discards
             self.discards = []
             random.shuffle(self.deck)
             self.on_deck = self.deck.pop(0)
-            print(self.on_deck)
-            import sys
-            sys.stdout.flush()
-
         else:
             self.field.append(self.on_deck)
             self.apply(lambda adv: adv.played_f, self.on_deck)
+            if len(self.deck) == 0:
+                self.deck += self.discards
+                random.shuffle(self.deck)
+                self.discards = []
             self.on_deck = self.deck.pop(0)
 
         self.red += self.on_deck.get_red()
@@ -247,7 +304,7 @@ class Player():
 
         if push:
             # Draw cards
-            if len(self.deck) > 0:
+            if len(self.deck) + len(self.discard) > 0:
                 self.draw()
 
             if MAX_EFF_REDS < self.eff_red:
@@ -255,9 +312,14 @@ class Player():
                 return
 
 
+
+
     @assert_invariants
     def harvest(self):
-        pass
+        print(self.field)
+        for card in self.field:
+            self.mana += card.get_mana()
+        print(self.mana)
 
     @assert_invariants
     def discard(self):
@@ -321,19 +383,26 @@ def main():
 
     # Game Loop
     while True:
+        print("Turn {}".format(turn))
         # If pool is empty, play until last player
         if point_pool <= 0 and turn % len(players) == 0:
             break
 
         cur_player = players[turn % len(players)]
-        if not cur_player.spoil:
+        if not cur_player.spoiled:
             cur_player.plant()
-        if not cur_player.spoil:
+        if not cur_player.spoiled:
             cur_player.harvest()
         cur_player.discard()
         cur_player.setup()
 
+        import sys
+        sys.stdout.flush()
+
+        print()
         turn += 1
+
+        time.sleep(0.5)
 
     # Post Game
     tally()
