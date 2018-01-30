@@ -68,9 +68,8 @@ class Advancement():
         self.ongoing_f = ongoing_f
         self.ondeck_f = ondeck_f
         self.played_f = played_f
-        self.plant_f = plant_f
         self.harvest_f = harvest_f
-        self.gather_f = gather_f
+        self.discard_f = discard_f
         self.end_game_f = end_game_f
 
         assert(0 <= cost <= 10)
@@ -222,9 +221,7 @@ class PointPool():
 
 
 def init_cards():
-
     purchase_field = PurchaseField(None)
-
     return purchase_field
 
 def tally():
