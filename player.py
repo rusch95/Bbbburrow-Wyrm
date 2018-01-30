@@ -8,9 +8,11 @@ NUM_DECK = 20
 NUM_BLANKS = 8
 MAX_EFF_REDS = 3
 class Player():
-    def __init__(self, i: int):
+    def __init__(self, purchase_field, pool, i: int):
         # Accumulate total for each phase, so effects can take place
         # on the totals
+        self.purchase_field = purchase_field
+        self.pool = pool
         self.num = i
 
         cursed_lands = [ Card(base=Advancement("Cursed Land", pos, 0, 0, mana=1, red=1),
@@ -41,7 +43,7 @@ class Player():
                (1 if self.on_deck is not None else 0) == NUM_DECK)
         assert(self.on_deck or self.on_deck is None)
 
-        assert(0 <= self.mana)
+        # assert(0 <= self.mana)
         assert(0 <= self.g_spirits)
         assert(0 <= self.y_spirits)
         assert(0 <= self.b_spirits)
@@ -76,8 +78,8 @@ class Player():
 
         # Get redness of previous card
         if self.on_deck:
-            self.red += self.on_deck.get_red()
-            self.green += self.on_deck.get_green()
+            self.red = self.on_deck.get_red()
+            self.green = self.on_deck.get_green()
 
         # Draw cards
         while self.eff_red() < MAX_EFF_REDS and (len(self.deck) + len(self.discards)) > 0:
@@ -121,8 +123,33 @@ class Player():
 
     @assert_invariants
     def harvest(self):
+
+        # Harvest Priority 5 - Sum up base stuff
         for card in self.field:
             self.mana += card.get_mana()
+            self.ppt += card.get_ppt()
+
+
+        print("PPT: {}".format(self.ppt))
+        print("Eff Red: {}".format(self.eff_red()))
+        print(self.field, self.on_deck)
+
+        # Simple Buying AI
+        done = False
+        for i, adv in list(enumerate(self.purchase_field.purchasable()))[::-1]:
+            if self.mana >= adv.cost:
+                for card in self.field:
+                    if adv.pos not in card.filled_slots():
+                        self.mana -= adv.cost
+                        self.purchase_field.purchase(i)
+                        card.purchases.append(adv)
+                        done = True
+                        break
+                if done:
+                    break
+
+        # Take points from pool
+        self.points += self.pool.take(self.ppt)
 
     @assert_invariants
     def discard(self):
@@ -134,6 +161,10 @@ class Player():
 
         self.discards += self.field
         self.field = []
+
+    def end_game(self):
+        for card in self.field:
+            self.points += card.get_points()
 
     def spoil(self):
         self.spoiled = False

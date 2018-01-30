@@ -5,7 +5,7 @@ def per_helmets(resource, n=1):
     def inner(player, card):
         new_val = card.helmets * n + getattr(card, resource)
         setattr(card, resource, new_val)
-    return innter
+    return inner
 
 def centaur(player, card):
     player.extra_turn = True
@@ -55,7 +55,7 @@ def nightvale_pathfinder(player, card):
 def peacekeeper_druid(player, card):
     pass
 
-def breastbrother_hunter(player, card):
+def beastbrother_hunter(player, card):
     player.ppt += max(0, 7 - len(player.field))
 
 def burrow_wyrm(player, card):
@@ -177,5 +177,5 @@ CARD_EFFECTS = {
     'Sporeling Reclaimer': sporeling_reclaimer,
     'Aurora': aurora,
     "Gaia's Chosen": gaias_chosen,
-    'Dawnfire Dragon', dawnfire_dragon,
+    'Dawnfire Dragon': dawnfire_dragon,
 }

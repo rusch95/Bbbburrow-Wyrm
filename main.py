@@ -10,20 +10,19 @@ def main():
 
     # Pre Game
     turn = 0
-    point_pool = POINTS[NUM_PLAYERS]
 
-    cards = init_cards()
+    point_pool = PointPool(POINTS[NUM_PLAYERS])
+    purchase_field = init_cards()
 
-    players = [Player(i) for i in range(NUM_PLAYERS)]
-    for _ in range(NUM_PLAYERS):
-        player = Player(cards)
+    players = [Player(purchase_field, point_pool, i) for i in range(NUM_PLAYERS)]
+    for player in players:
         player.setup()
 
     # Game Loop
     while True:
-        print("Turn {}".format(turn))
+        print("Player {} Turn {}".format((turn % NUM_PLAYERS + 1), (turn // NUM_PLAYERS + 1)))
         # If pool is empty, play until last player
-        if point_pool <= 0 and turn % len(players) == 0:
+        if point_pool.n <= 0 and turn % len(players) == 0:
             break
 
         cur_player = players[turn % len(players)]
@@ -40,10 +39,9 @@ def main():
         print()
         turn += 1
 
-        time.sleep(0.5)
-
     # Post Game
-    tally()
+    for player in players:
+        print("Player {} has {} points".format(player.num, player.points))
 
 if __name__ == '__main__':
     main()

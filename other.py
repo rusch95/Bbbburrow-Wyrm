@@ -1,8 +1,10 @@
 from enum import Enum
 import random
 import time
+import csv
 
 from player import *
+from effects import CARD_EFFECTS
 
 class Pos(Enum):
     none = 0
@@ -42,13 +44,12 @@ class Advancement():
         helmets: int = 0,
         red: int = 0,  # Number of Red Trees
         green: int = 0,  # Number of Green Trees
-        ongoing_f: Func = None,
-        ondeck_f: Func = None,
-        played_f: Func = None,
-        plant_f: Func = None,
-        harvest_f: Func = None,
-        gather_f: Func = None,
-        end_game_f: Func = None,
+        ongoing_f = None,
+        ondeck_f = None,
+        played_f = None,
+        harvest_f = None,
+        discard_f = None,
+        end_game_f = None,
     ):
 
         self.name = name
@@ -74,7 +75,6 @@ class Advancement():
 
         assert(0 <= cost <= 10)
         assert(0 <= rank <= 3)
-        assert(0 <= mana)
         assert(0 <= ppt)
         assert(0 <= g_spr)
         assert(0 <= y_spr)
@@ -84,6 +84,11 @@ class Advancement():
         assert(0 <= red)
         assert(0 <= green)
 
+    def __str__(self):
+        return self.name
+
+    def __repr__(self):
+        return self.name
 
 class Card():
     def __init__(self, base=None, perm_pos: Pos = Pos.none):
@@ -100,7 +105,9 @@ class Card():
 
     def compute(self):
         # TODO Handle ongoing and such
+
         if not self.computed:
+            self.recompute()
             for adv in self:
                 self.helmets += adv.helmets
                 self.mana += adv.mana
@@ -127,10 +134,14 @@ class Card():
 
         self.computed = False
 
+    def filled_slots(self):
+        return [adv.pos for adv in self.adv]
+
     def apply_purchases(self):
         for purchase in self.purchases:
             self.adv.append(purchase)
             self.recompute()
+        self.purchases = []
 
     def get_red(self):
         # TODO Handle ongoing effects
@@ -169,6 +180,12 @@ class Card():
         self.compute()
         return self.ppt
 
+    def get_points(self):
+        points = 0
+        for adv in self:
+            points += adv.points
+        return points
+
     def __iter__(self):
         return iter(self.adv)
 
@@ -177,13 +194,13 @@ class Card():
         top, mid, bot = "None", "None", "None"
         for adv in self.adv:
             if Pos.top == adv.pos:
-                top = adv.name
+                top = str(adv)
         for adv in self.adv:
             if Pos.mid == adv.pos:
-                mid = adv.name
+                mid = str(adv)
         for adv in self.adv:
             if Pos.bot == adv.pos:
-                bot = adv.name
+                bot = str(adv)
 
         return "[{}, {}, {}]".format(top, mid, bot)
 
@@ -200,32 +217,62 @@ def assert_invariants(f):
 
 
 class PurchaseField():
-    def __init__(self, thing):
+    def __init__(self, fname):
+        with open(fname, 'r') as f:
+            reader = csv.reader(f)
+            next(reader)
+            next(reader)
+            headers = next(reader)
+            all_cards = []
+            for row in reader:
+                card_kwargs = {k: v if k == 'name' else int(v)
+                               for k, v in zip(headers, row) if k and v}
+                for pos in NORM_POS:
+                    card_kwargs['pos'] = pos
+                    all_cards.append(Advancement(**card_kwargs))
 
-        adv_ones = []
-        adv_twos = []
-        adv_threes = []
+        random.shuffle(all_cards)
+
+        adv_ones = [adv for adv in all_cards if adv.rank == 1]
+        adv_twos = [adv for adv in all_cards if adv.rank == 2]
+        adv_threes = [adv for adv in all_cards if adv.rank == 3]
         vale_ones = []
         vale_twos = []
 
         # TODO Fertile Soils
-        self.adv_ones = random.shuffle(adv_ones)
-        self.adv_twos = random.shuffle(adv_twos)
-        self.adv_threes = random.shuffle(adv_threes)
-        self.vale_ones = random.shuffle(vale_ones)
-        self.vale_twos = random.shuffle(vale_twos)
+        self.adv_ones = adv_ones
+        self.adv_twos = adv_twos
+        self.adv_threes = adv_threes
+        self.vale_ones = vale_ones
+        self.vale_twos = vale_twos
+
+        print(adv_ones)
+
+    def purchasable(self):
+        return self.adv_ones[:3] + self.adv_twos[:3] + self.adv_threes[:3]
+
+    def purchase(self, i):
+        # Rank 1
+        if i < 3:
+            self.adv_ones.pop(i)
+        elif i < 6:
+            self.adv_twos.pop(i-3)
+        else:
+            self.adv_threes.pop(i-6)
 
 class PointPool():
-    def __init__(self, size):
-        self.size = size
+    def __init__(self, n):
+        self.n = n
+
+    def take(self, n):
+        self.n = max(0, self.n - n)
+        return n
 
 
 def init_cards():
-    purchase_field = PurchaseField(None)
+    purchase_field = PurchaseField('cards.csv')
     return purchase_field
 
-def tally():
-    pass
 
 NUM_PLAYERS = 3
 POINTS = [0, 18, 18, 23, 27, 31]  # TODO This is current wrong
